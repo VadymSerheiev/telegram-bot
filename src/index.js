@@ -14,6 +14,7 @@ require("./app/heroku");
 const app = express();
 require("./db/mongoose");
 require("./app/reminder");
+require("./app/replicator");
 const { BOT_TOKEN, BOT_ADMIN_ID } = process.env;
 const bot = new Bot(BOT_TOKEN);
 

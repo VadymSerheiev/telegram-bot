@@ -11,9 +11,15 @@ const { userKeyboards } = require("../keyboards/user");
 const { userMessages } = require("../messages/user");
 const User = require("../../db/models/user/user");
 const { replyMenuToContext } = require("grammy-inline-menu");
-const { getParticipantsFirstQueue } = require("../../db/models/course/functions");
-const { addUserToReminder, removeUserFromReminder } = require("../../db/models/reminder/functions");
-const { getCoursesInfo } = require("../xlsx");
+const {
+  getParticipantsFirstQueue,
+} = require("../../db/models/course/functions");
+const {
+  addUserToReminder,
+  removeUserFromReminder,
+} = require("../../db/models/reminder/functions");
+const { getCoursesInfo, getAllCollections } = require("../xlsx");
+
 const bot = new Bot(process.env.BOT_TOKEN);
 
 const user = new Composer();
@@ -30,7 +36,10 @@ user.command("start", async (ctx) => {
 user.command("test", async (ctx) => {
   await getCoursesInfo();
 
-  await bot.api.sendDocument(ctx.from.id, new InputFile(`src/files/xlsx.xlsx`, `example.xlsx`))
+  await bot.api.sendDocument(
+    ctx.from.id,
+    new InputFile(`src/files/xlsx.xlsx`, `example.xlsx`)
+  );
 });
 
 user.command("tariffs", async (ctx) => {
@@ -56,9 +65,9 @@ user.callbackQuery("backTariffPlans", async (ctx) => {
 });
 
 user.command("profile", async (ctx) => {
-const me = await User.findOne({userId: ctx.from.id})
+  const me = await User.findOne({ userId: ctx.from.id });
 
-ctx.reply(`${me.fullName}\n${me.questionary}`)
+  ctx.reply(`${me.fullName}\n${me.questionary}`);
 });
 
 user.command("payment", async (ctx) => {
@@ -90,12 +99,15 @@ user.callbackQuery(/chooseTariff/, async (ctx) => {
   if (isClosed) return;
   await setChoosedCourse(userId, tariff.toLowerCase());
 
-  await ctx.editMessageText(`${CONSTANTS.MY_PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`, {
-    chat_id,
-    message_id,
-    reply_markup: userKeyboards[`singleTariff${tariff}Menu`],
-    parse_mode: "Markdown",
-  });
+  await ctx.editMessageText(
+    `${CONSTANTS.MY_PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`,
+    {
+      chat_id,
+      message_id,
+      reply_markup: userKeyboards[`singleTariff${tariff}Menu`],
+      parse_mode: "Markdown",
+    }
+  );
 });
 
 user.callbackQuery(/returnTariff/, async (ctx) => {
@@ -104,12 +116,15 @@ user.callbackQuery(/returnTariff/, async (ctx) => {
   const tariff = ctx.callbackQuery.data.substring(12);
   const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
 
-  await ctx.editMessageText(`${CONSTANTS.MY_PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`, {
-    chat_id,
-    message_id,
-    reply_markup: userKeyboards[`singleTariff${tariff}Menu`],
-    parse_mode: "Markdown",
-  });
+  await ctx.editMessageText(
+    `${CONSTANTS.MY_PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`,
+    {
+      chat_id,
+      message_id,
+      reply_markup: userKeyboards[`singleTariff${tariff}Menu`],
+      parse_mode: "Markdown",
+    }
+  );
 });
 
 user.callbackQuery(/payNow/, async (ctx) => {
@@ -118,14 +133,14 @@ user.callbackQuery(/payNow/, async (ctx) => {
   const tariff = ctx.callbackQuery.data.substring(6);
   const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
 
-    await setWantToPayTariff(ctx);
+  await setWantToPayTariff(ctx);
 
-    await ctx.editMessageText(userMessages[`requisitesMessage${tariff}`], {
-      chat_id,
-      message_id,
-      reply_markup: userKeyboards[`requisites${tariff}Menu`],
-      parse_mode: "HTML",
-    });
+  await ctx.editMessageText(userMessages[`requisitesMessage${tariff}`], {
+    chat_id,
+    message_id,
+    reply_markup: userKeyboards[`requisites${tariff}Menu`],
+    parse_mode: "HTML",
+  });
 });
 
 user.callbackQuery("remind", async (ctx) => {
@@ -258,8 +273,8 @@ user.on("message", async (ctx) => {
   if (
     ctx?.update?.message?.reply_to_message?.text.includes(CONSTANTS.QUESTIONARY)
   ) {
-    const { questionary } =  await User.findOne({ userId: ctx.from.id });
-    const oldText = !questionary.length ? "" : `${questionary}. `
+    const { questionary } = await User.findOne({ userId: ctx.from.id });
+    const oldText = !questionary.length ? "" : `${questionary}. `;
     await User.findOneAndUpdate(
       { userId: ctx.from.id },
       { $set: { questionary: `${oldText}${ctx?.update?.message?.text}` } }
@@ -270,7 +285,6 @@ user.on("message", async (ctx) => {
     } else {
       ctx.reply("Чим більше ми про тебе дізнаємось, тим краще 😉");
     }
-    
   }
 });
 

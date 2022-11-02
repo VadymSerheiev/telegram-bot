@@ -1,6 +1,8 @@
 const XLSX = require("xlsx");
 const Course = require("../db/models/course/course");
+const Reminder = require("../db/models/reminder/reminder");
 const User = require("../db/models/user/user");
+
 
 const getCoursesInfo = async () => {
   const courses = await Course.find({ isCourseFinished: false });

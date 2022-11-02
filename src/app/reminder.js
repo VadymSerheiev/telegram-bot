@@ -5,8 +5,8 @@ const { userKeyboards } = require("./keyboards/user");
 const bot = new Bot(process.env.BOT_TOKEN);
 
 var CronJob = require("cron").CronJob;
-// every day at 15 pm
-var job = new CronJob("0 0 15 * * *", async () => {
+// every day at 12 pm (UTC)
+var reminder = new CronJob("0 0 12 * * *", async () => {
   const users = await getUsersToRemind();
   users.forEach(async (user) => {
     const ms = Date.now() - user.timestamp
@@ -26,4 +26,4 @@ var job = new CronJob("0 0 15 * * *", async () => {
   });
 });
 // Use this if the 4th param is default value(false)
-job.start();
+reminder.start();
