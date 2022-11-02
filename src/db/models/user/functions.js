@@ -153,9 +153,11 @@ const setWantToPayTariff = async (ctx) => {
 };
 
 const moveUserFromQueryToParticipants = async (userId) => {
-  const { choosedCourse, firstName, lastName, userName } = await User.findOne({
+  const { choosedCourse, firstName, lastName, userName } = await User.findOneAndUpdate({
     userId: userId,
-  });
+  },
+  { $set: { paymentStatus: 'paid' } }
+  );
 
   // delete from all courses queris if user choose another course after
   await checkIfUserAlreadyInQueue(userId);
@@ -174,6 +176,8 @@ const moveUserFromQueryToParticipants = async (userId) => {
       },
     }
   );
+
+  return choosedCourse;
 };
 
 module.exports = {

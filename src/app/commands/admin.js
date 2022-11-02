@@ -1,4 +1,4 @@
-const { Composer } = require("grammy");
+const { Bot, Composer, InputFile } = require("grammy");
 const { getUsersIds } = require("../../db/models/user/functions");
 const {
   createNewCourses,
@@ -8,16 +8,26 @@ const {
 const Course = require("../../db/models/course/course");
 const { adminMessages } = require("../messages/admin");
 
+const bot = new Bot(process.env.BOT_TOKEN);
+
 const admin = new Composer();
 
-const checkIsAdmin = (ctx, process) => {
-  const { id } = ctx.from;
+const checkIsAdmin = (ctx) => {
+  // console.log(ctx)
+  console.log(ctx.update.channel_post.sender_chat);
+  let id = ctx?.from?.id || "";
+
+  if (!id) {
+    id = ctx.update.channel_post.sender_chat.id;
+  }
 
   if (
     String(id) === process.env.BOT_ADMIN_ID ||
     String(id) === process.env.BOT_SUPPORT_ID
-  )
+  ) {
     return true;
+  }
+    
 
   return false;
 };
@@ -36,11 +46,12 @@ admin.command("myId", (ctx) => {
 });
 
 admin.command("channelId", (ctx) => {
-  if (checkIsAdmin(ctx, process)) {
-    if (Boolean(ctx?.update?.channel_post?.chat?.id))
-      ctx.reply(`ID канала: ${ctx?.update?.channel_post?.chat?.id}`, {
-        chat_id: BOT_ADMIN_ID,
-      });
+  if (checkIsAdmin(ctx)) {
+    if (Boolean(ctx.update.channel_post.sender_chat.id))
+      bot.api.sendMessage(
+        process.env.BOT_ADMIN_ID,
+        `ID канала: ${ctx.update.channel_post.sender_chat.id}`
+      );
   }
 });
 
@@ -65,6 +76,15 @@ admin.command("showCourses", async (ctx) => {
 
     ctx.reply(courses || "Нет курсов");
   }
+});
+
+admin.command("test", async (ctx) => {
+  await getCoursesInfo();
+
+  await bot.api.sendDocument(
+    ctx.from.id,
+    new InputFile(`src/files/xlsx.xlsx`, `example.xlsx`)
+  );
 });
 
 module.exports = admin;

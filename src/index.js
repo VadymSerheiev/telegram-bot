@@ -6,8 +6,10 @@ const user = require("./app/commands/user");
 const { CONSTANTS } = require("./app/constans/user");
 const User = require("./db/models/user/user");
 const { initCreateCourses } = require("./db/models/course/functions");
-const {userKeyboards} = require("./app/keyboards/user");
-const { moveUserFromQueryToParticipants } = require("./db/models/user/functions");
+const { userKeyboards } = require("./app/keyboards/user");
+const {
+  moveUserFromQueryToParticipants,
+} = require("./db/models/user/functions");
 const { initCreateReminder } = require("./db/models/reminder/functions");
 require("./app/heroku");
 
@@ -21,28 +23,45 @@ const bot = new Bot(BOT_TOKEN);
 initCreateCourses();
 initCreateReminder();
 
+const middlewareFn = async(ctx,next) => {
+  // check if chat is private
+  if (ctx.chat.type === "private") {
+    await next();
+  }
+}
+
+// bot.use(middlewareFn)
 bot.use(admin);
 bot.use(user);
 
-// bot.api.setMyCommands([
-//   { command: "start", description: "Перезавантажити бот" },
-//   { command: "tariffs", description: "Тарифні плани" },
-//   { command: "payment", description: "Передплата" }, // ?
-//   { command: "profile", description: "Мій профіль" }, // ?
-//   { command: "support", description: "Підтримка" },
-//   { command: "certeficat", description: "Приклад сертифікату" },
-//   { command: "reviews", description: "Відгуки про нас" },
-// ]);
+if (process.env.APP_STATUS === "production") {
+  bot.api.setMyCommands([
+    { command: "start", description: "Перезавантажити бот" },
+    { command: "tariffs", description: "Тарифні плани" },
+    { command: "payment", description: "Передплата" }, // ?
+    { command: "profile", description: "Мій профіль" }, // ?
+    { command: "support", description: "Підтримка" },
+    { command: "certeficat", description: "Приклад сертифікату" },
+    { command: "reviews", description: "Відгуки про нас" },
+  ]);
+}
 
 bot.callbackQuery(/infoTariff/, async (ctx) => {
   await ctx.answerCallbackQuery(); // remove loading animation
   const chat_id = ctx.update.callback_query.message.chat.id;
   const tariff = await ctx.callbackQuery.data.substring(10);
   await ctx.deleteMessage();
-  await bot.api.sendDocument(chat_id, new InputFile(`src/files/structure${tariff}.pdf`, `Структура курсу ${tariff}.pdf`), {
-    caption: CONSTANTS[`TARIFF_${tariff}_DESCRIPTION`],
-    reply_markup: userKeyboards.backTariffPlans
-  })
+  await bot.api.sendDocument(
+    chat_id,
+    new InputFile(
+      `src/files/structure${tariff}.pdf`,
+      `Структура курсу ${tariff}.pdf`
+    ),
+    {
+      caption: CONSTANTS[`TARIFF_${tariff}_DESCRIPTION`],
+      reply_markup: userKeyboards.backTariffPlans,
+    }
+  );
 });
 
 bot.callbackQuery(/paid/, async (ctx) => {
@@ -50,10 +69,14 @@ bot.callbackQuery(/paid/, async (ctx) => {
   const userId = ctx.callbackQuery.data.substring(4);
   await ctx.deleteMessage();
 
-  await moveUserFromQueryToParticipants(userId);
-
-  const { invite_link } = await bot.api.createChatInviteLink("-1001678728685", {
+  // retrun course shortName to find id of channel to invite
+  const choosedCourse = await moveUserFromQueryToParticipants(userId);
+  
+  //24 hours experation time limit
+  const willExpire = (Date.now()/1000) + (24*60*60);
+  const { invite_link } = await bot.api.createChatInviteLink(process.env[`CHANNEL_${choosedCourse.toUpperCase()}`], {
     member_limit: 1,
+    expire_date: Number(willExpire)
   });
 
   await ctx.api.sendMessage(
@@ -64,12 +87,10 @@ bot.callbackQuery(/paid/, async (ctx) => {
     }
   );
 
-  await ctx.api.sendMessage(
-    userId,
-    CONSTANTS.QUESTIONARY
-  );
+  await ctx.api.sendMessage(userId, CONSTANTS.QUESTIONARY);
 });
 
+// error handler for bot
 bot.catch((err) => {
   const ctx = err.ctx;
   console.error(`Error while handling update ${ctx.update.update_id}:`);

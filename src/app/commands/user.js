@@ -10,7 +10,6 @@ const {
 const { userKeyboards } = require("../keyboards/user");
 const { userMessages } = require("../messages/user");
 const User = require("../../db/models/user/user");
-const { replyMenuToContext } = require("grammy-inline-menu");
 const {
   getParticipantsFirstQueue,
 } = require("../../db/models/course/functions");
@@ -31,15 +30,6 @@ user.command("start", async (ctx) => {
   await ctx.reply(CONSTANTS.GREETINGS, {
     reply_markup: userKeyboards.mainMenu,
   });
-});
-
-user.command("test", async (ctx) => {
-  await getCoursesInfo();
-
-  await bot.api.sendDocument(
-    ctx.from.id,
-    new InputFile(`src/files/xlsx.xlsx`, `example.xlsx`)
-  );
 });
 
 user.command("tariffs", async (ctx) => {
@@ -67,7 +57,41 @@ user.callbackQuery("backTariffPlans", async (ctx) => {
 user.command("profile", async (ctx) => {
   const me = await User.findOne({ userId: ctx.from.id });
 
-  ctx.reply(`${me.fullName}\n${me.questionary}`);
+  const getPaymentStatus = (status) => {
+    switch (status) {
+      case "unpaid":
+        return "⛔️ Не сплачено";
+      case "pending":
+        return "⏳ Перевіряється";
+      case "paid":
+        return "✅Сплачено";
+    }
+  };
+
+  const ID = me.userId;
+  const userName = me.userName.length
+    ? `\n*User name*: \`${me.userName}\``
+    : "";
+  const firstName = me.firstName.length
+    ? `\n*First name*: \`${me.firstName}\``
+    : "";
+  const lastName = me.lastName.length
+    ? `\n*Last name*: \`${me.lastName}\``
+    : "";
+  const fullName = me.fullName.length
+    ? `\n*Full name*: \`${me.fullName}\``
+    : "";
+  const questionary = me.questionary.length
+    ? `\n*Про мене*: \`${me.questionary}\``
+    : "";
+  const paymentStatus = getPaymentStatus(me.paymentStatus);
+
+  ctx.reply(
+    `*ID*: \`${ID}\`${userName}${firstName}${lastName}${fullName}\n*Обраний курс*: \`${me.choosedCourse.toUpperCase()}\`\n*Статус платежу*: \`${paymentStatus}\`${questionary}`,
+    {
+      parse_mode: "Markdown",
+    }
+  );
 });
 
 user.command("payment", async (ctx) => {
@@ -206,22 +230,30 @@ user.on(":photo", async (ctx) => {
 
   await User.findOneAndUpdate(
     { userId: ctx.from.id },
-    { $set: { fullName: caption } }
+    { $set: { fullName: caption, paymentStatus: "pending" } }
+  );
+});
+
+user.command("certeficat", async (ctx) => {
+  console.log(ctx)
+  const chat_id = ctx.update.message.chat.id;
+
+  await bot.api.sendDocument(
+    chat_id,
+    new InputFile(
+      "src/files/serteficate.pdf",
+      "Приклад сертифікату.pdf"
+    ),
+    {
+      caption: "Приклад сертифікат, який Ви отримаєте по завершенню кусру."
+    }
   );
 });
 
 user.command(
-  "certeficat",
-  (ctx) =>
-    // maybe save file with admin commands in project?
-    ctx.replyWithDocument(new InputFile("src/files/example.pdf"))
-  // maybe send message with some description?
-);
-
-user.command(
   "reviews",
   (ctx) =>
-    ctx.reply("[Отзывы о нас](https://www.google.com/)", {
+    ctx.reply("[Відгуки про нас](https://www.google.com/)\n\nЗа цим посиланням Ви можете ознайомитись з відгуками про нас.", {
       parse_mode: "Markdown",
     })
   // maybe send message with some description?
@@ -230,23 +262,15 @@ user.command(
 user.command(
   "support",
   // send contact or just link?
-  (ctx) => {
-    ctx.replyWithContact("+380505736797", "Vadym");
-    ctx.reply(
-      "Если у Вас вознкинут какие-либо вопросы, обращайтесь к нашему менеджеру."
+  async (ctx) => {
+    await ctx.replyWithContact("+380505736797", "Vadym");
+    await ctx.reply(
+      "Якщо у Вас виникнуть будь-які питання, Ви можете звернутись до нашого менеджера."
     );
   }
   // ctx.reply("[Связь с нашим менеджером](tg://user?id=306726408)", {
   //   parse_mode: 'Markdown'
   // })
-);
-
-user.command(
-  "structure",
-  (ctx) =>
-    // maybe seva file with admin commands in project?
-    ctx.replyWithDocument(new InputFile("src/files/example.pdf"))
-  // maybe send message with some description?
 );
 
 user.on("message", async (ctx) => {
@@ -267,6 +291,53 @@ user.on("message", async (ctx) => {
         reply_markup: userKeyboards.tariffsMenu,
         parse_mode: "Markdown",
       }
+    );
+  }
+
+  if (ctx?.update?.message?.text === CONSTANTS.MY_PROFILE) {
+    const me = await User.findOne({ userId: ctx.from.id });
+
+    const getPaymentStatus = (status) => {
+      switch (status) {
+        case "unpaid":
+          return "⛔️ Не сплачено";
+        case "pending":
+          return "⏳ Перевіряється";
+        case "paid":
+          return "✅ Сплачено";
+      }
+    };
+
+    const ID = me.userId;
+    const userName = me.userName.length
+      ? `\n*User name*: \`${me.userName}\``
+      : "";
+    const firstName = me.firstName.length
+      ? `\n*First name*: \`${me.firstName}\``
+      : "";
+    const lastName = me.lastName.length
+      ? `\n*Last name*: \`${me.lastName}\``
+      : "";
+    const fullName = me.fullName.length
+      ? `\n*Full name*: \`${me.fullName}\``
+      : "";
+    const questionary = me.questionary.length
+      ? `\n*Про мене*: \`${me.questionary}\``
+      : "";
+    const paymentStatus = getPaymentStatus(me.paymentStatus);
+
+    ctx.reply(
+      `*ID*: \`${ID}\`${userName}${firstName}${lastName}${fullName}\n*Обраний курс*: \`${me.choosedCourse.toUpperCase()}\`\n*Статус платежу*: \`${paymentStatus}\`${questionary}`,
+      {
+        parse_mode: "Markdown",
+      }
+    );
+  }
+
+  if (ctx?.update?.message?.text === CONSTANTS.SUPPORT) {
+    await ctx.replyWithContact("+380505736797", "Vadym");
+    await ctx.reply(
+      "Якщо у Вас виникнуть будь-які питання, Ви можете звернутись до нашого менеджера."
     );
   }
 
