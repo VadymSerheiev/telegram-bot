@@ -7,6 +7,7 @@ const {
   checkIsCourseClosed,
   setChoosedCourse,
   getChoosedCourse,
+  getChoosedCourseAndPaymentStatus,
 } = require("../../db/models/user/functions");
 const { userKeyboards } = require("../keyboards/user");
 const { userMessages } = require("../messages/user");
@@ -119,11 +120,10 @@ user.callbackQuery(/chooseTariff/, async (ctx) => {
   await ctx.answerCallbackQuery(); // remove loading animation
 
   const tariff = ctx.callbackQuery.data.substring(12);
-  const { userId, chat_id, message_id } = getCallbackChatAndMessageId(ctx);
+  const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
 
   const isClosed = await checkIsCourseClosed(ctx, tariff.toLowerCase());
   if (isClosed) return;
-  await setChoosedCourse(userId, tariff.toLowerCase());
 
   await ctx.editMessageText(
     `${CONSTANTS.MY_PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`,
@@ -157,7 +157,9 @@ user.callbackQuery(/payNow/, async (ctx) => {
   await ctx.answerCallbackQuery(); // remove loading animation
 
   const tariff = ctx.callbackQuery.data.substring(6);
-  const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
+  const { userId, chat_id, message_id } = getCallbackChatAndMessageId(ctx);
+
+  await setChoosedCourse(userId, tariff.toLowerCase());
 
   await setWantToPayTariff(ctx);
 
@@ -210,12 +212,22 @@ user.callbackQuery("backTariffs", async (ctx) => {
 // receives only photo with caption
 // only private chat
 user.on(":photo", async (ctx) => {
-  const choosedCourse = await getChoosedCourse(ctx);
+  const {choosedCourse, paymentStatus} = await getChoosedCourseAndPaymentStatus(ctx);
   const isChoosedCourse = Boolean(choosedCourse.length);
 
   if (!isChoosedCourse) {
     await ctx.reply(
       `Вибачте, Ви ще не обрали курс. Для того щоб обрати курс перейдіть будь ласка до пункту \"*${CONSTANTS.MY_PAYMENT}*\" і оберіть будь ласка курс.`,
+      {
+        parse_mode: "Markdown",
+      }
+    );
+    return;
+  }
+
+  if (paymentStatus === "paid") {
+    await ctx.reply(
+      `Ви вже є учасником одного з курсів.`,
       {
         parse_mode: "Markdown",
       }
@@ -377,10 +389,9 @@ user.on("message", async (ctx) => {
     ctx?.update?.message?.reply_to_message?.text.includes(CONSTANTS.QUESTIONARY)
   ) {
     const { questionary } = await User.findOne({ userId: ctx.from.id });
-    const oldText = !questionary.length ? "" : `${questionary}. `;
     await User.findOneAndUpdate(
       { userId: ctx.from.id },
-      { $set: { questionary: `${oldText}${ctx?.update?.message?.text}` } }
+      { $set: { questionary: `${questionary}. ${ctx?.update?.message?.text}` } }
     );
 
     if (!questionary.length) {

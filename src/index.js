@@ -26,12 +26,17 @@ initCreateCourses();
 initCreateReminder();
 
 const middlewareFn = async(ctx,next) => {
-  // check if chat is private
-  if (ctx.chat.type === "private" && adminMessages.adminCommandsArray.some((command) => command === ctx?.update?.message?.text) && checkIsAdmin(ctx)) {
+  console.log(ctx?.update)
+  if (ctx?.chat?.type === "channel" && "/channelId" === ctx?.update?.channel_post?.text) {
     return await next();
   }
 
-  if (ctx.chat.type === "private" && !adminMessages.adminCommandsArray.some((command) => command === ctx?.update?.message?.text)) {
+  // check if chat is private
+  if (ctx?.chat?.type === "private" && adminMessages.adminCommandsArray.some((command) => command === ctx?.update?.message?.text) && checkIsAdmin(ctx)) {
+    return await next();
+  }
+
+  if (ctx?.chat?.type === "private" && !adminMessages.adminCommandsArray.some((command) => command === ctx?.update?.message?.text)) {
     return await next();
   }
 }
@@ -95,11 +100,15 @@ bot.callbackQuery(/paid/, async (ctx) => {
 });
 
 // error handler for bot
-bot.catch((err) => {
+bot.catch(async (err) => {
   const ctx = err.ctx;
   console.error(`Error while handling update ${ctx.update.update_id}:`);
   const e = err.error;
   if (e) {
+    await ctx.api.sendMessage(
+      process.env.BOT_SUPPORT_ID,
+      "⚠️ Error. Please check console."
+    );
     console.error("Error:", e);
   }
 });

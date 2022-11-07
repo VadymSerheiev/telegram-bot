@@ -36,10 +36,10 @@ const checkAndCreateNewUser = async (ctx) => {
   }
 };
 
-const getChoosedCourse = async (ctx) => {
+const getChoosedCourseAndPaymentStatus = async (ctx) => {
   const { id: userId } = ctx.from;
-  const { choosedCourse } = await User.findOne({ userId: userId});
-  return choosedCourse;
+  const { choosedCourse, paymentStatus } = await User.findOne({ userId: userId });
+  return { choosedCourse, paymentStatus };
 };
 
 const getUsersIds = async () => {
@@ -52,6 +52,10 @@ const getUsersIds = async () => {
 };
 
 const setChoosedCourse = async (userId, tariff) => {
+  const { paymentStatus } = await User.findOne({ userId });
+
+  if (paymentStatus === "paid") return;
+
   await User.findOneAndUpdate({ userId }, { $set: { choosedCourse: tariff } });
 };
 
@@ -62,9 +66,7 @@ const checkIsCourseClosed = async (ctx, tariff) => {
   });
 
   if (!Boolean(isRecruitmentOpened)) {
-    ctx.reply(
-      "Вибачте, набір на цей курс тимчасово призупинено."
-    );
+    ctx.reply("Вибачте, набір на цей курс тимчасово призупинено.");
     return true;
   }
 
@@ -125,10 +127,10 @@ const setWantToPayTariff = async (ctx) => {
       { $set: { isRecruitmentOpened: false } }
     );
 
-    // await ctx.api.sendMessage(
-    //   process.env.BOT_ADMIN_ID,
-    //   `Набор на курсы ${choosedCourse} - временно закрыт.`
-    // );
+    await ctx.api.sendMessage(
+      process.env.BOT_ADMIN_ID,
+      `Набір на курс ${choosedCourse} - тимачасово зупинено.`
+    );
   }
 
   // if (Boolean(choosedCourse)) {
@@ -190,7 +192,7 @@ const moveUserFromQueryToParticipants = async (userId) => {
 };
 
 const checkIsAdmin = (ctx) => {
-  let {id = ""} = ctx.from;
+  let { id = "" } = ctx.from;
 
   if (
     String(id) === process.env.BOT_ADMIN_ID ||
@@ -209,6 +211,6 @@ module.exports = {
   setChoosedCourse,
   checkIsCourseClosed,
   moveUserFromQueryToParticipants,
-  getChoosedCourse,
-  checkIsAdmin
+  getChoosedCourseAndPaymentStatus,
+  checkIsAdmin,
 };

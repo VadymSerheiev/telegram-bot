@@ -6,7 +6,6 @@ const User = require("../db/models/user/user");
 const { userKeyboards } = require("./keyboards/user");
 const bot = new Bot(process.env.BOT_TOKEN);
 const CronJob = require("cron").CronJob;
-const { Dropbox } = require("dropbox");
 const { default: fetch } = require("node-fetch");
 const { google } = require("googleapis");
 

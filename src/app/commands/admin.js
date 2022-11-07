@@ -47,16 +47,18 @@ admin.command("coursesInfo", async (ctx) => {
   );
 });
 
-// admin.command("test", async (ctx) => {
-  
-// });
+// hidden commands
 
-// admin.command("channelId", (ctx) => {
-//   if (Boolean(ctx.update.channel_post.sender_chat.id))
-//     bot.api.sendMessage(
-//       process.env.BOT_ADMIN_ID,
-//       `ID канала: ${ctx.update.channel_post.sender_chat.id}`
-//     );
+admin.command("channelId", (ctx) => {
+  if (Boolean(ctx?.update?.channel_post?.sender_chat?.id))
+    bot.api.sendMessage(
+      process.env.BOT_ADMIN_ID,
+      `ID канала ${ctx.update.channel_post.sender_chat.title}: ${ctx.update.channel_post.sender_chat.id}`
+    );
+});
+
+
+// admin.command("test", async (ctx) => {
 // });
 
 // admin.command("usersIds", async (ctx) => {
