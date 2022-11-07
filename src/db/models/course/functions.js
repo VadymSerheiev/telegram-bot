@@ -2,11 +2,20 @@ const User = require("../user/user");
 const Course = require("./course");
 
 const finishCourses = async () => {
+  await User.updateMany({}, {$set: { choosedCourse: "", paymentStatus: "unpaid" }})
   await Course.updateMany({ isCourseFinished: false }, {$set: { isCourseFinished: true }});
 };
 
+const closeRecruitment = async () => {
+  await Course.updateMany({ isRecruitmentOpened: true, isCourseFinished: false }, {$set: { isRecruitmentOpened: false }});
+};
+
+const startRecruitment = async () => {
+  await Course.updateMany({ isRecruitmentOpened: false, isCourseFinished: false }, {$set: { isRecruitmentOpened: true }});
+};
+
 const createNewCourses = async (isFinish = true) => {
-  if (isFinish) finishCourses();
+  if (isFinish) await finishCourses();
 
   const newCourses = [
     { name: "Course A1", shortName: "a1" },
@@ -35,23 +44,10 @@ const courses = await Course.find({});
   createNewCourses();
 }
 
-const getCoursesInfo = async () => {
-  const courses = await Course.find({ isCourseFinished: false });
-
-  return courses.sort()
-    .map(
-      (course) =>
-        `${course.name}\nУчастники:\n${course.participants.join(
-          "\n"
-        )}\nОжидаем оплату:\n${course.participantsFirstQueue.join("\n")}\n`
-    )
-    .join("---------------------------\n");
-};
-
 const payCourse = async (userId) => {
   const { choosedCourse = "" } = await User.findOne({ userId });
   await Course.findOneAndUpdate(
-    { shortName: choosedCourse, isRecruitmentOpened: true, recruitmentClosed: false },
+    { shortName: choosedCourse, isRecruitmentOpened: true },
     {
       $pull: { participantsFirstQueue: userId },
       $push: { participants: userId },
@@ -62,7 +58,8 @@ const payCourse = async (userId) => {
 module.exports = {
   createNewCourses,
   finishCourses,
-  getCoursesInfo,
   payCourse,
   initCreateCourses,
+  closeRecruitment,
+  startRecruitment
 };

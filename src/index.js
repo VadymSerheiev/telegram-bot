@@ -8,9 +8,11 @@ const User = require("./db/models/user/user");
 const { initCreateCourses } = require("./db/models/course/functions");
 const { userKeyboards } = require("./app/keyboards/user");
 const {
-  moveUserFromQueryToParticipants,
+  moveUserFromQueryToParticipants, checkIsAdmin,
 } = require("./db/models/user/functions");
 const { initCreateReminder } = require("./db/models/reminder/functions");
+const { update } = require("./db/models/user/user");
+const { adminMessages } = require("./app/messages/admin");
 require("./app/heroku");
 
 const app = express();
@@ -25,12 +27,16 @@ initCreateReminder();
 
 const middlewareFn = async(ctx,next) => {
   // check if chat is private
-  if (ctx.chat.type === "private") {
-    await next();
+  if (ctx.chat.type === "private" && adminMessages.adminCommandsArray.some((command) => command === ctx?.update?.message?.text) && checkIsAdmin(ctx)) {
+    return await next();
+  }
+
+  if (ctx.chat.type === "private" && !adminMessages.adminCommandsArray.some((command) => command === ctx?.update?.message?.text)) {
+    return await next();
   }
 }
 
-// bot.use(middlewareFn)
+bot.use(middlewareFn)
 bot.use(admin);
 bot.use(user);
 
@@ -73,10 +79,8 @@ bot.callbackQuery(/paid/, async (ctx) => {
   const choosedCourse = await moveUserFromQueryToParticipants(userId);
   
   //24 hours experation time limit
-  const willExpire = (Date.now()/1000) + (24*60*60);
   const { invite_link } = await bot.api.createChatInviteLink(process.env[`CHANNEL_${choosedCourse.toUpperCase()}`], {
-    member_limit: 1,
-    expire_date: Number(willExpire)
+    member_limit: 1
   });
 
   await ctx.api.sendMessage(

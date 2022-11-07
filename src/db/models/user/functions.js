@@ -36,6 +36,12 @@ const checkAndCreateNewUser = async (ctx) => {
   }
 };
 
+const getChoosedCourse = async (ctx) => {
+  const { id: userId } = ctx.from;
+  const { choosedCourse } = await User.findOne({ userId: userId});
+  return choosedCourse;
+};
+
 const getUsersIds = async () => {
   const users = await User.find({});
   return users
@@ -57,7 +63,7 @@ const checkIsCourseClosed = async (ctx, tariff) => {
 
   if (!Boolean(isRecruitmentOpened)) {
     ctx.reply(
-      "Извините, набор на этот курс уже закрыт. Мы Вас проинформируем, когда появятся новые места."
+      "Вибачте, набір на цей курс тимчасово призупинено."
     );
     return true;
   }
@@ -80,9 +86,10 @@ const checkIfUserAlreadyInQueue = async (userId) => {
 const setWantToPayTariff = async (ctx) => {
   const userId = ctx.update.callback_query.from.id;
 
-  const { choosedCourse, firstName, lastName, userName, fullName } = await User.findOne({
-    userId: userId,
-  });
+  const { choosedCourse, firstName, lastName, userName, fullName } =
+    await User.findOne({
+      userId: userId,
+    });
 
   // check if user already in queue and remove him
   await checkIfUserAlreadyInQueue(userId);
@@ -115,7 +122,7 @@ const setWantToPayTariff = async (ctx) => {
   if (joinedAllParticipants >= joinedMaxParticipants) {
     await Course.findOneAndUpdate(
       { shortName: choosedCourse, isCourseFinished: false },
-      { $set: { isRecruitmentOpened: false, recruitmentClosed: true } }
+      { $set: { isRecruitmentOpened: false } }
     );
 
     // await ctx.api.sendMessage(
@@ -153,11 +160,13 @@ const setWantToPayTariff = async (ctx) => {
 };
 
 const moveUserFromQueryToParticipants = async (userId) => {
-  const { choosedCourse, firstName, lastName, userName } = await User.findOneAndUpdate({
-    userId: userId,
-  },
-  { $set: { paymentStatus: 'paid' } }
-  );
+  const { choosedCourse, firstName, lastName, userName } =
+    await User.findOneAndUpdate(
+      {
+        userId: userId,
+      },
+      { $set: { paymentStatus: "paid" } }
+    );
 
   // delete from all courses queris if user choose another course after
   await checkIfUserAlreadyInQueue(userId);
@@ -180,6 +189,19 @@ const moveUserFromQueryToParticipants = async (userId) => {
   return choosedCourse;
 };
 
+const checkIsAdmin = (ctx) => {
+  let {id = ""} = ctx.from;
+
+  if (
+    String(id) === process.env.BOT_ADMIN_ID ||
+    String(id) === process.env.BOT_SUPPORT_ID
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
 module.exports = {
   checkAndCreateNewUser,
   getUsersIds,
@@ -187,4 +209,6 @@ module.exports = {
   setChoosedCourse,
   checkIsCourseClosed,
   moveUserFromQueryToParticipants,
+  getChoosedCourse,
+  checkIsAdmin
 };

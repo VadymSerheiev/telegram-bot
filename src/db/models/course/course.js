@@ -33,18 +33,6 @@ const Course = mongoose.model("Course", {
     ],
     default: [],
   },
-  participantsSecondQueue: {
-    type: [
-      {
-        userId: String,
-        firstName: String,
-        lastName: String,
-        userName: String,
-        timestamp: Number,
-      },
-    ],
-    default: [],
-  },
   maxParticipants: {
     // add validation to check max participants to be recruitmentClosed after ?
     type: Number,
