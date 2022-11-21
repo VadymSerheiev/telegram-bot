@@ -7,6 +7,10 @@ const mainMenu = new Keyboard()
   .row()
   .text(CONSTANTS.MY_PROFILE)
   .text(CONSTANTS.SUPPORT)
+  .row()
+  .text(CONSTANTS.CERTIFICATE)
+  .text(CONSTANTS.REVIEWS)
+  .row()
   .resized();
 
 const tariffPlans = new InlineKeyboard()
@@ -31,7 +35,7 @@ const createSingleTariffMenu = (tariff) => {
   return new InlineKeyboard()
     .text(CONSTANTS.PAY_NOW, `payNow${tariff}`)
     .row()
-    .text(CONSTANTS.LET_ME_THINK,"remind")
+    .text(CONSTANTS.LET_ME_THINK,`remind${tariff}`)
     .row()
     .text(CONSTANTS.DONT_REMIND, "notRemind")
     .row()
@@ -59,6 +63,10 @@ const notRemind = new InlineKeyboard()
   .text(CONSTANTS.DONT_REMIND, "notRemind")
   .row()
 
+  const reviewsButton = new InlineKeyboard()
+  .url(CONSTANTS.REVIEWS, process.env.REVIEWS)
+  .row()
+
 module.exports = {
   userKeyboards: {
     mainMenu,
@@ -72,5 +80,6 @@ module.exports = {
     requisitesA2Menu,
     requisitesB1Menu,
     notRemind,
+    reviewsButton,
   },
 };

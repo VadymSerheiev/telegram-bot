@@ -25,10 +25,16 @@ const removeUserFromReminder = async (userId) => {
   );
 }
 
-const addUserToReminder = async (userId) => {
+const addUserToReminder = async (userId, course) => {
   const { choosedCourse, firstName, lastName, userName } = await User.findOne({
     userId: userId,
   });
+
+  if (!Boolean(choosedCourse.length)) {
+    await User.findOneAndUpdate({
+      userId: userId,
+    }, { $set: { choosedCourse: course.toLowerCase() }})
+  }
 
   // remove if user already in reminder
   await removeUserFromReminder(userId);

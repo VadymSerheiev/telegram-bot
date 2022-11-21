@@ -9,7 +9,8 @@ const {
 const Course = require("../../db/models/course/course");
 const { adminMessages } = require("../messages/admin");
 const { getCoursesInfo } = require("../xlsx");
-const { getAllCollections, createAndUploadFile } = require("../replicator");
+const { generateDate, getCallbackChatAndMessageId } = require("../functions");
+const { adminKeyboards } = require("../keyboards/admin")
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
@@ -33,9 +34,37 @@ admin.command("startRecruitment", async (ctx) => {
 });
 
 admin.command("closeCourses", async (ctx) => {
-  await createNewCourses();
+  ctx.reply(
+    'Ви дійсно хочете закрити всі курси і розпочати нові?',
+    {
+      reply_markup: adminKeyboards.sureCloseCourses,
+      parse_mode: "Markdown",
+    }
+  );
+});
 
-  await ctx.reply("Курси завершено і створено нові.", { parse_mode: "Markdown" });
+admin.callbackQuery('sureCloseCourses', async (ctx) => {
+  await ctx.answerCallbackQuery(); // remove loading animation
+  const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
+  await createNewCourses();
+  await ctx.editMessageText(
+    "✅ Курси закрито і створено нові.",
+    {
+      chat_id,
+      message_id,
+    }
+  );
+});
+
+admin.callbackQuery('notSureCloseCourses', async (ctx) => {
+  const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
+  await ctx.editMessageText(
+    '🚫 Операцію відмінено.',
+    {
+      chat_id,
+      message_id,
+    }
+  );
 });
 
 admin.command("coursesInfo", async (ctx) => {
@@ -43,7 +72,50 @@ admin.command("coursesInfo", async (ctx) => {
 
   await bot.api.sendDocument(
     ctx.from.id,
-    new InputFile(`src/files/xlsx.xlsx`, `example-${Date.now()}.xlsx`)
+    new InputFile(`src/files/xlsx.xlsx`, `courses-${generateDate()}.xlsx`)
+  );
+});
+
+admin.command("uploadFiles", async (ctx) => {
+  ctx.reply(
+    'Необхідно надіслати коментарем id файлу у google drive, попередньо відкривши доступ до нього за посиланням.\n\nОберіть файл для заміни:',
+    {
+      reply_markup: adminKeyboards.filesUpload,
+      parse_mode: "Markdown",
+    }
+  );
+});
+
+admin.callbackQuery('backFilesUpload', async (ctx) => {
+  await ctx.answerCallbackQuery(); // remove loading animation
+  
+  const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
+
+  await ctx.editMessageText(
+    'Необхідно надіслати коментарем id файлу у google drive, попередньо відкривши доступ до нього за посиланням.\n\nОберіть файл для заміни:',
+    {
+      chat_id,
+      message_id,
+      reply_markup: adminKeyboards.filesUpload,
+      parse_mode: "Markdown",
+    }
+  );
+});
+
+admin.callbackQuery(/upload/, async (ctx) => {
+  await ctx.answerCallbackQuery(); // remove loading animation
+  
+  const file = ctx.callbackQuery.data.substring(6);
+  const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
+
+  await ctx.editMessageText(
+    file,
+    {
+      chat_id,
+      message_id,
+      reply_markup: adminKeyboards.backFilesUpload,
+      parse_mode: "Markdown",
+    }
   );
 });
 
@@ -57,8 +129,8 @@ admin.command("channelId", (ctx) => {
     );
 });
 
-
 // admin.command("test", async (ctx) => {
+//   ctx.reply(generateDate());
 // });
 
 // admin.command("usersIds", async (ctx) => {

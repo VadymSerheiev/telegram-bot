@@ -3,6 +3,7 @@ const { Bot, InputFile } = require("grammy");
 const express = require("express");
 const admin = require("./app/commands/admin");
 const user = require("./app/commands/user");
+const messages = require("./app/commands/messages");
 const { CONSTANTS } = require("./app/constans/user");
 const User = require("./db/models/user/user");
 const { initCreateCourses } = require("./db/models/course/functions");
@@ -13,7 +14,6 @@ const {
 const { initCreateReminder } = require("./db/models/reminder/functions");
 const { update } = require("./db/models/user/user");
 const { adminMessages } = require("./app/messages/admin");
-require("./app/heroku");
 
 const app = express();
 require("./db/mongoose");
@@ -26,7 +26,7 @@ initCreateCourses();
 initCreateReminder();
 
 const middlewareFn = async(ctx,next) => {
-  console.log(ctx?.update)
+  // console.log(ctx?.update)
   if (ctx?.chat?.type === "channel" && "/channelId" === ctx?.update?.channel_post?.text) {
     return await next();
   }
@@ -44,6 +44,7 @@ const middlewareFn = async(ctx,next) => {
 bot.use(middlewareFn)
 bot.use(admin);
 bot.use(user);
+bot.use(messages);
 
 if (process.env.APP_STATUS === "production") {
   bot.api.setMyCommands([
@@ -52,7 +53,7 @@ if (process.env.APP_STATUS === "production") {
     { command: "payment", description: "Передплата" }, // ?
     { command: "profile", description: "Мій профіль" }, // ?
     { command: "support", description: "Підтримка" },
-    { command: "certeficat", description: "Приклад сертифікату" },
+    { command: "certificate", description: "Приклад сертифікату" },
     { command: "reviews", description: "Відгуки про нас" },
   ]);
 }
@@ -81,9 +82,8 @@ bot.callbackQuery(/paid/, async (ctx) => {
   await ctx.deleteMessage();
 
   // retrun course shortName to find id of channel to invite
-  const choosedCourse = await moveUserFromQueryToParticipants(userId);
+  const {choosedCourse, fullName, questionary} = await moveUserFromQueryToParticipants(userId);
   
-  //24 hours experation time limit
   const { invite_link } = await bot.api.createChatInviteLink(process.env[`CHANNEL_${choosedCourse.toUpperCase()}`], {
     member_limit: 1
   });
@@ -96,7 +96,24 @@ bot.callbackQuery(/paid/, async (ctx) => {
     }
   );
 
-  await ctx.api.sendMessage(userId, CONSTANTS.QUESTIONARY);
+  // ask full name
+  if (!Boolean(fullName.length) && !Boolean(questionary.length)) {
+    await ctx.api.sendMessage(userId, CONSTANTS.FULL_NAME);
+  }
+});
+
+bot.callbackQuery(/denied/, async (ctx) => {
+  await ctx.answerCallbackQuery(); // remove loading animation
+  const userId = ctx.callbackQuery.data.substring(6);
+  await ctx.deleteMessage();
+
+  await ctx.api.sendMessage(
+    userId,
+    `Нажаль Ваш платіж не підтверджено. Зверніться будь ласка до підтримки.`,
+    {
+      parse_mode: "Markdown",
+    }
+  );
 });
 
 // error handler for bot

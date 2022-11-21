@@ -8,6 +8,7 @@ const {
   setChoosedCourse,
   getChoosedCourse,
   getChoosedCourseAndPaymentStatus,
+  isRecruitmentOpened,
 } = require("../../db/models/user/functions");
 const { userKeyboards } = require("../keyboards/user");
 const { userMessages } = require("../messages/user");
@@ -21,6 +22,7 @@ const {
 } = require("../../db/models/reminder/functions");
 const { getCoursesInfo, getAllCollections } = require("../xlsx");
 const { createAndUploadFile } = require("../replicator");
+const { getCallbackChatAndMessageId } = require("../functions");
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
@@ -82,7 +84,7 @@ user.command("profile", async (ctx) => {
     ? `\n*Last name*: \`${me.lastName}\``
     : "";
   const fullName = me.fullName.length
-    ? `\n*Full name*: \`${me.fullName}\``
+    ? `\n*Ім'я та прізвище*: \`${me.fullName}\``
     : "";
   const questionary = me.questionary.length
     ? `\n*Про мене*: \`${me.questionary}\``
@@ -98,6 +100,11 @@ user.command("profile", async (ctx) => {
 });
 
 user.command("payment", async (ctx) => {
+  const isOpened = await isRecruitmentOpened();
+  if (!isOpened) {
+    return await ctx.reply("Вибачте, в даний момент набір на курси зачинено.");
+  }
+
   await ctx.reply(
     `*${CONSTANTS.MY_PAYMENT}\n\n*Оберіть, будь ласка, тариф за яким Ви бажаєте здійснити передплату.`,
     {
@@ -106,14 +113,6 @@ user.command("payment", async (ctx) => {
     }
   );
 });
-
-const getCallbackChatAndMessageId = (ctx) => {
-  const chat_id = ctx.update.callback_query.message.chat.id;
-  const message_id = ctx.update.callback_query.message.message_id;
-  const userId = ctx.update.callback_query.from.id;
-
-  return { userId, chat_id, message_id };
-};
 
 // get rid of lower case
 user.callbackQuery(/chooseTariff/, async (ctx) => {
@@ -161,7 +160,11 @@ user.callbackQuery(/payNow/, async (ctx) => {
 
   await setChoosedCourse(userId, tariff.toLowerCase());
 
-  await setWantToPayTariff(ctx);
+  const isSucess = await setWantToPayTariff(ctx);
+
+  if (!isSucess) {
+    return;
+  }
 
   await ctx.editMessageText(userMessages[`requisitesMessage${tariff}`], {
     chat_id,
@@ -171,12 +174,13 @@ user.callbackQuery(/payNow/, async (ctx) => {
   });
 });
 
-user.callbackQuery("remind", async (ctx) => {
+user.callbackQuery(/remind[A-Z][1-9]/, async (ctx) => {
   await ctx.answerCallbackQuery(); // remove loading animation
-
+  
+  const tariff = ctx.callbackQuery.data.substring(6);
   const { chat_id } = getCallbackChatAndMessageId(ctx);
 
-  await addUserToReminder(chat_id);
+  await addUserToReminder(chat_id, tariff);
   // message that succesfully added to reminder? send message or owerite?
 
   await ctx.reply("✅ Ми Вам нагадаємо про сплату.");
@@ -243,7 +247,8 @@ user.on(":photo", async (ctx) => {
   }
 
   const approvePay = new InlineKeyboard()
-    .text("Підтвердити оплату", `paid${ctx.from.id}`)
+    .text("✅ Підтвердити оплату", `paid${ctx.from.id}`)
+    .text("🚫 Скасувати оплату", `denied${ctx.from.id}`)
     .row();
 
   await ctx.api.sendPhoto(
@@ -257,23 +262,34 @@ user.on(":photo", async (ctx) => {
 
   await User.findOneAndUpdate(
     { userId: ctx.from.id },
-    { $set: { fullName: caption, paymentStatus: "pending" } }
+    { $set: { paymentStatus: "pending" } }
   );
 
-  await createAndUploadFile(ctx.update.message.photo[ctx.update.message.photo.length - 1].file_id,'check','checks');
+  await createAndUploadFile({
+    sender: caption,
+    userId: ctx.from.id,
+    fileId: ctx.update.message.photo[ctx.update.message.photo.length - 1].file_id,
+    data: null,
+    type:'check',
+    folder: 'checks'
+  });
+
+  const now = new Date();
+  if ((now.getUTCHours() <= 6) || (now.getUTCHours() >= 18)) {
+    await ctx.reply("Вибачте, наш робочий день завершився. Ми постараємося відповісти Вам якомога швидше.")
+  }
 
   await ctx.reply("Наш менеджер отримав фото чеку. Після підтвердження платежу ви отримаєте повідомлення.");
 });
 
-user.command("certeficat", async (ctx) => {
-  console.log(ctx);
+user.command("certificate", async (ctx) => {
   const chat_id = ctx.update.message.chat.id;
 
   await bot.api.sendDocument(
     chat_id,
-    new InputFile("src/files/serteficate.pdf", "Приклад сертифікату.pdf"),
+    new InputFile("src/files/certificate.pdf", "Приклад сертифікату.pdf"),
     {
-      caption: "Приклад сертифікат, який Ви отримаєте по завершенню кусру.",
+      caption: "Приклад сертифікату, який Ви отримаєте по завершенню курсу.",
     }
   );
 });
@@ -282,8 +298,9 @@ user.command(
   "reviews",
   (ctx) =>
     ctx.reply(
-      "[Відгуки про нас](https://www.google.com/)\n\nЗа цим посиланням Ви можете ознайомитись з відгуками про нас.",
+      `За цим посиланням Ви можете ознайомитись з відгуками про нас.`,
       {
+        reply_markup: userKeyboards.reviewsButton,
         parse_mode: "Markdown",
       }
     )
@@ -294,6 +311,11 @@ user.command(
   "support",
   // send contact or just link?
   async (ctx) => {
+    const now = new Date();
+    if ((now.getUTCHours() <= 6) || (now.getUTCHours() >= 18)) {
+      await ctx.reply("Вибачте, наш робочий день завершився. Ми постараємося відповісти Вам якомога швидше.")
+    }
+
     await ctx.replyWithContact("+380505736797", "Vadym");
     await ctx.reply(
       "Якщо у Вас виникнуть будь-які питання, Ви можете звернутись до нашого менеджера."
@@ -303,109 +325,5 @@ user.command(
   //   parse_mode: 'Markdown'
   // })
 );
-
-user.on("message", async (ctx) => {
-  if (ctx?.update?.message?.text === CONSTANTS.TARIFF_PLANS) {
-    ctx.reply(
-      `*${CONSTANTS.TARIFF_PLANS}*\n\nЗагальна інформація про тарифні плани з прикладом структури курсів.`,
-      {
-        reply_markup: userKeyboards.tariffPlans,
-        parse_mode: "Markdown",
-      }
-    );
-
-    return;
-  }
-
-  if (ctx?.update?.message?.text === CONSTANTS.MY_PAYMENT) {
-    ctx.reply(
-      `*${CONSTANTS.MY_PAYMENT}\n\n*Оберіть, будь ласка, тариф за яким Ви бажаєте здійснити передплату.`,
-      {
-        reply_markup: userKeyboards.tariffsMenu,
-        parse_mode: "Markdown",
-      }
-    );
-
-    return;
-  }
-
-  if (ctx?.update?.message?.text === CONSTANTS.MY_PROFILE) {
-    const me = await User.findOne({ userId: ctx.from.id });
-
-    const getPaymentStatus = (status) => {
-      switch (status) {
-        case "unpaid":
-          return "⛔️ Не сплачено";
-        case "pending":
-          return "⏳ Перевіряється";
-        case "paid":
-          return "✅ Сплачено";
-      }
-    };
-
-    const ID = me.userId;
-    const userName = me.userName.length
-      ? `\n*User name*: \`${me.userName}\``
-      : "";
-    const firstName = me.firstName.length
-      ? `\n*First name*: \`${me.firstName}\``
-      : "";
-    const lastName = me.lastName.length
-      ? `\n*Last name*: \`${me.lastName}\``
-      : "";
-    const fullName = me.fullName.length
-      ? `\n*Full name*: \`${me.fullName}\``
-      : "";
-    const course = me.choosedCourse.length
-      ? `\n*Обраний курс*: \`${me.choosedCourse.toUpperCase()}\``
-      : "\n*Обраний курс*: `➖ Не обрано`";
-    const questionary = me.questionary.length
-      ? `\n*Про мене*: \`${me.questionary}\``
-      : "";
-    const paymentStatus = me.choosedCourse.length
-      ? `\n*Статус платежу*: \`${getPaymentStatus(me.paymentStatus)}\``
-      : "";
-
-    ctx.reply(
-      `*ID*: \`${ID}\`${userName}${firstName}${lastName}${fullName}${course}${paymentStatus}${questionary}`,
-      {
-        parse_mode: "Markdown",
-      }
-    );
-
-    return;
-  }
-
-  if (ctx?.update?.message?.text === CONSTANTS.SUPPORT) {
-    await ctx.replyWithContact("+380505736797", "Vadym");
-    await ctx.reply(
-      "Якщо у Вас виникнуть будь-які питання, Ви можете звернутись до нашого менеджера."
-    );
-
-    return;
-  }
-
-  if (
-    ctx?.update?.message?.reply_to_message?.text.includes(CONSTANTS.QUESTIONARY)
-  ) {
-    const { questionary } = await User.findOne({ userId: ctx.from.id });
-    await User.findOneAndUpdate(
-      { userId: ctx.from.id },
-      { $set: { questionary: `${questionary}. ${ctx?.update?.message?.text}` } }
-    );
-
-    if (!questionary.length) {
-      ctx.reply("Приємно познайомитись 😉");
-    } else {
-      ctx.reply("Чим більше ми про тебе дізнаємось, тим краще 😉");
-    }
-
-    return;
-  }
-
-  await ctx.reply(
-    "Вибачте, я не розумію цієї команди 🤷‍♂️ Можливо Ви хотіли відповісти на якесь моє повідомлення?"
-  );
-});
 
 module.exports = user;

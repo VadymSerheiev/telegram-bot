@@ -1,3 +1,4 @@
+const { getCallbackChatAndMessageId } = require("../../../app/functions");
 const Course = require("../course/course");
 const User = require("./user");
 
@@ -88,10 +89,21 @@ const checkIfUserAlreadyInQueue = async (userId) => {
 const setWantToPayTariff = async (ctx) => {
   const userId = ctx.update.callback_query.from.id;
 
-  const { choosedCourse, firstName, lastName, userName, fullName } =
+  const { choosedCourse, firstName, lastName, userName, fullName, paymentStatus } =
     await User.findOne({
       userId: userId,
     });
+
+  if (paymentStatus === "paid") {
+    const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
+
+    await ctx.editMessageText("Ви вже є учасником одного з курсів.", {
+      chat_id,
+      message_id,
+    });
+
+    return false;
+  }
 
   // check if user already in queue and remove him
   await checkIfUserAlreadyInQueue(userId);
@@ -159,10 +171,11 @@ const setWantToPayTariff = async (ctx) => {
   //     );
   //   }
   // }
+  return true;
 };
 
 const moveUserFromQueryToParticipants = async (userId) => {
-  const { choosedCourse, firstName, lastName, userName } =
+  const { choosedCourse, firstName, lastName, userName, fullName, questionary } =
     await User.findOneAndUpdate(
       {
         userId: userId,
@@ -188,7 +201,7 @@ const moveUserFromQueryToParticipants = async (userId) => {
     }
   );
 
-  return choosedCourse;
+  return {choosedCourse, fullName, questionary};
 };
 
 const checkIsAdmin = (ctx) => {
@@ -204,6 +217,12 @@ const checkIsAdmin = (ctx) => {
   return false;
 };
 
+const isRecruitmentOpened = async () => {
+  const openedCourses = await Course.find({ isRecruitmentOpened: true, isCourseFinished: false})
+
+  return Boolean(openedCourses.length);
+}
+
 module.exports = {
   checkAndCreateNewUser,
   getUsersIds,
@@ -213,4 +232,5 @@ module.exports = {
   moveUserFromQueryToParticipants,
   getChoosedCourseAndPaymentStatus,
   checkIsAdmin,
+  isRecruitmentOpened,
 };

@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { generateDate } = require("../../../app/functions");
 
 const Course = mongoose.model("Course", {
   name: {
@@ -46,6 +47,22 @@ const Course = mongoose.model("Course", {
     type: Boolean,
     default: false,
   },
+  courseStartDate: {
+    type: String,
+    default: generateDate()
+  },
+  courseEndDate: {
+    type: String,
+    default: ""
+  },
+  courseStartTimestamp: {
+    type: Number,
+    default: Date.now()
+  },
+  courseEndTimestamp: {
+    type: Number,
+    default: 0
+  }
 });
 
 module.exports = Course;

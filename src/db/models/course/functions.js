@@ -1,9 +1,10 @@
+const { generateDate } = require("../../../app/functions");
 const User = require("../user/user");
 const Course = require("./course");
 
 const finishCourses = async () => {
   await User.updateMany({}, {$set: { choosedCourse: "", paymentStatus: "unpaid" }})
-  await Course.updateMany({ isCourseFinished: false }, {$set: { isCourseFinished: true }});
+  await Course.updateMany({ isCourseFinished: false }, {$set: { isCourseFinished: true, courseEndDate: generateDate(), courseEndTimestamp: Date.now() }});
 };
 
 const closeRecruitment = async () => {
