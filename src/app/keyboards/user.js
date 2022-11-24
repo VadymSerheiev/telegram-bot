@@ -3,7 +3,7 @@ const { CONSTANTS } = require("../constans/user");
 
 const mainMenu = new Keyboard()
   .text(CONSTANTS.TARIFF_PLANS)
-  .text(CONSTANTS.MY_PAYMENT)
+  .text(CONSTANTS.PAYMENT)
   .row()
   .text(CONSTANTS.MY_PROFILE)
   .text(CONSTANTS.SUPPORT)
@@ -14,21 +14,21 @@ const mainMenu = new Keyboard()
   .resized();
 
 const tariffPlans = new InlineKeyboard()
-  .text("Тариф А1", "infoTariffA1")
+  .text(CONSTANTS.TARIFF_A1, "infoTariffA1")
   .row()
-  .text("Тариф А2", "infoTariffA2")
+  .text(CONSTANTS.TARIFF_A2, "infoTariffA2")
   .row()
-  .text("Тариф В1", "infoTariffB1")
+  .text(CONSTANTS.TARIFF_B1, "infoTariffB1")
   .row();
 
 const backTariffPlans = new InlineKeyboard().text(CONSTANTS.BACK, "backTariffPlans").row();
 
 const tariffsMenu = new InlineKeyboard()
-  .text("Тариф А1", "chooseTariffA1")
+  .text(CONSTANTS.TARIFF_A1, "chooseTariffA1")
   .row()
-  .text("Тариф А2", "chooseTariffA2")
+  .text(CONSTANTS.TARIFF_A2, "chooseTariffA2")
   .row()
-  .text("Тариф В1", "chooseTariffB1")
+  .text(CONSTANTS.TARIFF_B1, "chooseTariffB1")
   .row();
 
 const createSingleTariffMenu = (tariff) => {
@@ -51,7 +51,7 @@ const createRequisitesMenu = (tariff) => {
   return new InlineKeyboard()
     .text(CONSTANTS.BACK, `returnTariff${tariff}`)
     .row()
-    .text("↩️ Усі тарифи", "backTariffs")
+    .text(CONSTANTS.ALL_TARIFFS, "backTariffs")
     .row();
 };
 

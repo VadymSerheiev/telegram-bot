@@ -1,5 +1,5 @@
 const adminCommands = [
-  "/admin - Вызвать админ панель",
+  "/admin - Викликати адмін панель",
   "/coursesInfo - Інформація про набір у xlsx файлі",
   "/stopRecruitment - Зупинити набір на курси",
   "/startRecruitment - Відновити набір на курси",

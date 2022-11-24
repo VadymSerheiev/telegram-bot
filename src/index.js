@@ -1,26 +1,30 @@
+// imports env constants
 require("dotenv").config();
+// modules
 const { Bot, InputFile } = require("grammy");
 const express = require("express");
+// commands
 const admin = require("./app/commands/admin");
 const user = require("./app/commands/user");
 const messages = require("./app/commands/messages");
+// constants
 const { CONSTANTS } = require("./app/constans/user");
-const User = require("./db/models/user/user");
+// functions
 const { initCreateCourses } = require("./db/models/course/functions");
-const { userKeyboards } = require("./app/keyboards/user");
 const {
   moveUserFromQueryToParticipants, checkIsAdmin,
 } = require("./db/models/user/functions");
 const { initCreateReminder } = require("./db/models/reminder/functions");
-const { update } = require("./db/models/user/user");
+// keyboards
+const { userKeyboards } = require("./app/keyboards/user");
+// admin commands array to validate admin in middleware
 const { adminMessages } = require("./app/messages/admin");
 
 const app = express();
 require("./db/mongoose");
 require("./app/reminder");
 require("./app/replicator");
-const { BOT_TOKEN, BOT_ADMIN_ID } = process.env;
-const bot = new Bot(BOT_TOKEN);
+const bot = new Bot(process.env.BOT_TOKEN);
 
 initCreateCourses();
 initCreateReminder();
@@ -47,15 +51,7 @@ bot.use(user);
 bot.use(messages);
 
 if (process.env.APP_STATUS === "production") {
-  bot.api.setMyCommands([
-    { command: "start", description: "Перезавантажити бот" },
-    { command: "tariffs", description: "Тарифні плани" },
-    { command: "payment", description: "Передплата" }, // ?
-    { command: "profile", description: "Мій профіль" }, // ?
-    { command: "support", description: "Підтримка" },
-    { command: "certificate", description: "Приклад сертифікату" },
-    { command: "reviews", description: "Відгуки про нас" },
-  ]);
+  bot.api.setMyCommands(CONSTANTS.USER_COMMANDS);
 }
 
 bot.callbackQuery(/infoTariff/, async (ctx) => {
@@ -90,7 +86,7 @@ bot.callbackQuery(/paid/, async (ctx) => {
 
   await ctx.api.sendMessage(
     userId,
-    `✅ Оплата підтверджена.\nДякуємо Вам за оплату!\n\n[Запрошення до нашого закритого каналу.](${invite_link})`,
+    `${CONSTANTS.PAYMENT_SUCCESS}\n\n[${CONSTANTS.INVITE_LINK}](${invite_link})`,
     {
       parse_mode: "Markdown",
     }
@@ -109,7 +105,7 @@ bot.callbackQuery(/denied/, async (ctx) => {
 
   await ctx.api.sendMessage(
     userId,
-    `Нажаль Ваш платіж не підтверджено. Зверніться будь ласка до підтримки.`,
+    CONSTANTS.PAYMENT_FAIL,
     {
       parse_mode: "Markdown",
     }

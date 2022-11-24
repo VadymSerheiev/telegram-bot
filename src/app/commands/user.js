@@ -1,34 +1,35 @@
+// modules
 const { Composer, Bot } = require("grammy");
 const { InlineKeyboard, InputFile } = require("grammy");
+// constants
 const { CONSTANTS } = require("../constans/user");
+// functions
 const {
   checkAndCreateNewUser,
   setWantToPayTariff,
   checkIsCourseClosed,
   setChoosedCourse,
-  getChoosedCourse,
   getChoosedCourseAndPaymentStatus,
   isRecruitmentOpened,
 } = require("../../db/models/user/functions");
-const { userKeyboards } = require("../keyboards/user");
-const { userMessages } = require("../messages/user");
-const User = require("../../db/models/user/user");
-const {
-  getParticipantsFirstQueue,
-} = require("../../db/models/course/functions");
 const {
   addUserToReminder,
   removeUserFromReminder,
 } = require("../../db/models/reminder/functions");
-const { getCoursesInfo, getAllCollections } = require("../xlsx");
 const { createAndUploadFile } = require("../replicator");
 const { getCallbackChatAndMessageId } = require("../functions");
+// keyboards
+const { userKeyboards } = require("../keyboards/user");
+const { userMessages } = require("../messages/user");
+// models
+const User = require("../../db/models/user/user");
+const { ADMIN_CONSTANTS } = require("../constans/admin");
+
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
 const user = new Composer();
 
-// add відгуки and приклад сертифікату
 user.command("start", async (ctx) => {
   await checkAndCreateNewUser(ctx);
 
@@ -39,7 +40,7 @@ user.command("start", async (ctx) => {
 
 user.command("tariffs", async (ctx) => {
   await ctx.reply(
-    `*${CONSTANTS.TARIFF_PLANS}*\n\nЗагальна інформація про тарифні плани з прикладом структури курсів.`,
+    `*${CONSTANTS.TARIFF_PLANS}*\n\n${CONSTANTS.TARIFFS_DESCRIPTION}`,
     {
       reply_markup: userKeyboards.tariffPlans,
       parse_mode: "Markdown",
@@ -48,10 +49,10 @@ user.command("tariffs", async (ctx) => {
 });
 
 user.callbackQuery("backTariffPlans", async (ctx) => {
-  await ctx.answerCallbackQuery(); // remove loading animation
+  await ctx.answerCallbackQuery(); // removes loading animation
   await ctx.deleteMessage();
   await ctx.reply(
-    `*${CONSTANTS.TARIFF_PLANS}*\n\nЗагальна інформація про тарифні плани з прикладом структури курсів.`,
+    `*${CONSTANTS.TARIFF_PLANS}*\n\n${CONSTANTS.TARIFFS_DESCRIPTION}`,
     {
       reply_markup: userKeyboards.tariffPlans,
       parse_mode: "Markdown",
@@ -65,34 +66,41 @@ user.command("profile", async (ctx) => {
   const getPaymentStatus = (status) => {
     switch (status) {
       case "unpaid":
-        return "⛔️ Не сплачено";
+        return CONSTANTS.UNPAID;
       case "pending":
-        return "⏳ Перевіряється";
+        return CONSTANTS.PENDING;
       case "paid":
-        return "✅Сплачено";
+        return CONSTANTS.PAID;
     }
   };
 
-  const ID = me.userId;
+  const ID = `*ID*: \`${me.userId}\``;
   const userName = me.userName.length
-    ? `\n*User name*: \`${me.userName}\``
+    ? `\n*${CONSTANTS.USER_NAME}*: \`${me.userName}\``
     : "";
   const firstName = me.firstName.length
-    ? `\n*First name*: \`${me.firstName}\``
+    ? `\n*${CONSTANTS.FIRST_NAME}*: \`${me.firstName}\``
     : "";
   const lastName = me.lastName.length
-    ? `\n*Last name*: \`${me.lastName}\``
+    ? `\n*${CONSTANTS.LAST_NAME}*: \`${me.lastName}\``
     : "";
   const fullName = me.fullName.length
-    ? `\n*Ім'я та прізвище*: \`${me.fullName}\``
+    ? `\n*${CONSTANTS.FULL_NAME}*: \`${me.fullName}\``
     : "";
+  const course = me.choosedCourse.length
+    ? `\n*${CONSTANTS.CHOOSED_COURSE}*: \`${me.choosedCourse.toUpperCase()}\``
+    : `\n*${CONSTANTS.CHOOSED_COURSE}*: \`${CONSTANTS.NOT_CHOOSED_COURSE}\``;
   const questionary = me.questionary.length
-    ? `\n*Про мене*: \`${me.questionary}\``
+    ? `\n*${CONSTANTS.QUESTIONARY}*: \`${me.questionary}\``
     : "";
-  const paymentStatus = getPaymentStatus(me.paymentStatus);
+  const paymentStatus = me.choosedCourse.length
+    ? `\n*${CONSTANTS.PAYMENT_STATUS}*: \`${getPaymentStatus(
+        me.paymentStatus
+      )}\``
+    : "";
 
   ctx.reply(
-    `*ID*: \`${ID}\`${userName}${firstName}${lastName}${fullName}\n*Обраний курс*: \`${me.choosedCourse.toUpperCase()}\`\n*Статус платежу*: \`${paymentStatus}\`${questionary}`,
+    `${ID}${userName}${firstName}${lastName}${fullName}${course}${paymentStatus}${questionary}`,
     {
       parse_mode: "Markdown",
     }
@@ -102,11 +110,11 @@ user.command("profile", async (ctx) => {
 user.command("payment", async (ctx) => {
   const isOpened = await isRecruitmentOpened();
   if (!isOpened) {
-    return await ctx.reply("Вибачте, в даний момент набір на курси зачинено.");
+    return await ctx.reply(CONSTANTS.SORRY_RECRUITMENT_CLOSED);
   }
 
   await ctx.reply(
-    `*${CONSTANTS.MY_PAYMENT}\n\n*Оберіть, будь ласка, тариф за яким Ви бажаєте здійснити передплату.`,
+    `*${CONSTANTS.PAYMENT}\n\n*${CONSTANTS.PAYMENT_DESCRIPTION}`,
     {
       reply_markup: userKeyboards.tariffsMenu,
       parse_mode: "Markdown",
@@ -125,7 +133,7 @@ user.callbackQuery(/chooseTariff/, async (ctx) => {
   if (isClosed) return;
 
   await ctx.editMessageText(
-    `${CONSTANTS.MY_PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`,
+    `${CONSTANTS.PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`,
     {
       chat_id,
       message_id,
@@ -142,7 +150,7 @@ user.callbackQuery(/returnTariff/, async (ctx) => {
   const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
 
   await ctx.editMessageText(
-    `${CONSTANTS.MY_PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`,
+    `${CONSTANTS.PAYMENT} ➡️ *${CONSTANTS[`TARIFF_${tariff}`]}*`,
     {
       chat_id,
       message_id,
@@ -176,14 +184,14 @@ user.callbackQuery(/payNow/, async (ctx) => {
 
 user.callbackQuery(/remind[A-Z][1-9]/, async (ctx) => {
   await ctx.answerCallbackQuery(); // remove loading animation
-  
+
   const tariff = ctx.callbackQuery.data.substring(6);
   const { chat_id } = getCallbackChatAndMessageId(ctx);
 
   await addUserToReminder(chat_id, tariff);
   // message that succesfully added to reminder? send message or owerite?
 
-  await ctx.reply("✅ Ми Вам нагадаємо про сплату.");
+  await ctx.reply(CONSTANTS.WE_WILL_REMIND_YOU);
 });
 
 user.callbackQuery("notRemind", async (ctx) => {
@@ -194,7 +202,7 @@ user.callbackQuery("notRemind", async (ctx) => {
   await removeUserFromReminder(chat_id);
   // message that succesfully added to reminder? send message or owerite?
 
-  await ctx.reply("Ми більше не будемо Вам нагадувати про сплату 😉");
+  await ctx.reply(CONSTANTS.NEVER_REMIND);
 });
 
 user.callbackQuery("backTariffs", async (ctx) => {
@@ -203,7 +211,7 @@ user.callbackQuery("backTariffs", async (ctx) => {
   const { chat_id, message_id } = getCallbackChatAndMessageId(ctx);
 
   await ctx.editMessageText(
-    `*${CONSTANTS.MY_PAYMENT}\n\n*Оберіть, будь ласка, тариф за яким Ви бажаєте здійснити передплату.`,
+    `*${CONSTANTS.PAYMENT}\n\n*${CONSTANTS.PAYMENT_DESCRIPTION}`,
     {
       chat_id,
       message_id,
@@ -216,26 +224,21 @@ user.callbackQuery("backTariffs", async (ctx) => {
 // receives only photo with caption
 // only private chat
 user.on(":photo", async (ctx) => {
-  const {choosedCourse, paymentStatus} = await getChoosedCourseAndPaymentStatus(ctx);
+  const { choosedCourse, paymentStatus } =
+    await getChoosedCourseAndPaymentStatus(ctx);
   const isChoosedCourse = Boolean(choosedCourse.length);
 
   if (!isChoosedCourse) {
-    await ctx.reply(
-      `Вибачте, Ви ще не обрали курс. Для того щоб обрати курс перейдіть будь ласка до пункту \"*${CONSTANTS.MY_PAYMENT}*\" і оберіть будь ласка курс.`,
-      {
-        parse_mode: "Markdown",
-      }
-    );
+    await ctx.reply(CONSTANTS.NOT_CHOOSED_COURSE_MESSAGE, {
+      parse_mode: "Markdown",
+    });
     return;
   }
 
   if (paymentStatus === "paid") {
-    await ctx.reply(
-      `Ви вже є учасником одного з курсів.`,
-      {
-        parse_mode: "Markdown",
-      }
-    );
+    await ctx.reply(ALREADY_PARTICIPANT, {
+      parse_mode: "Markdown",
+    });
     return;
   }
 
@@ -247,15 +250,15 @@ user.on(":photo", async (ctx) => {
   }
 
   const approvePay = new InlineKeyboard()
-    .text("✅ Підтвердити оплату", `paid${ctx.from.id}`)
-    .text("🚫 Скасувати оплату", `denied${ctx.from.id}`)
+    .text(ADMIN_CONSTANTS.APPLY_PAYMENT, `paid${ctx.from.id}`)
+    .text(ADMIN_CONSTANTS.DENIE_PAYMENT, `denied${ctx.from.id}`)
     .row();
 
   await ctx.api.sendPhoto(
     process.env.BOT_ADMIN_ID,
     ctx.update.message.photo[ctx.update.message.photo.length - 1].file_id,
     {
-      caption: `Відправник: ${caption}`,
+      caption: `${ADMIN_CONSTANTS.SENDER}: ${caption}`,
       reply_markup: approvePay,
     }
   );
@@ -268,18 +271,19 @@ user.on(":photo", async (ctx) => {
   await createAndUploadFile({
     sender: caption,
     userId: ctx.from.id,
-    fileId: ctx.update.message.photo[ctx.update.message.photo.length - 1].file_id,
+    fileId:
+      ctx.update.message.photo[ctx.update.message.photo.length - 1].file_id,
     data: null,
-    type:'check',
-    folder: 'checks'
+    type: "check",
+    folder: "checks",
   });
 
   const now = new Date();
-  if ((now.getUTCHours() <= 6) || (now.getUTCHours() >= 18)) {
-    await ctx.reply("Вибачте, наш робочий день завершився. Ми постараємося відповісти Вам якомога швидше.")
+  if (now.getUTCHours() <= 6 || now.getUTCHours() >= 18) {
+    await ctx.reply(CONSTANTS.WORK_GRAPHIC);
   }
 
-  await ctx.reply("Наш менеджер отримав фото чеку. Після підтвердження платежу ви отримаєте повідомлення.");
+  await ctx.reply(CONSTANTS.RECIEVED_CHECK);
 });
 
 user.command("certificate", async (ctx) => {
@@ -287,9 +291,12 @@ user.command("certificate", async (ctx) => {
 
   await bot.api.sendDocument(
     chat_id,
-    new InputFile("src/files/certificate.pdf", "Приклад сертифікату.pdf"),
+    new InputFile(
+      "src/files/certificate.pdf",
+      `${CONSTANTS.CERTIFICATE_FILE_NAME}.pdf`
+    ),
     {
-      caption: "Приклад сертифікату, який Ви отримаєте по завершенню курсу.",
+      caption: CONSTANTS.CERTIFICATE_DESCRIPTION,
     }
   );
 });
@@ -297,13 +304,10 @@ user.command("certificate", async (ctx) => {
 user.command(
   "reviews",
   (ctx) =>
-    ctx.reply(
-      `За цим посиланням Ви можете ознайомитись з відгуками про нас.`,
-      {
-        reply_markup: userKeyboards.reviewsButton,
-        parse_mode: "Markdown",
-      }
-    )
+    ctx.reply(CONSTANTS.REVIEWS_DESCRIPTION, {
+      reply_markup: userKeyboards.reviewsButton,
+      parse_mode: "Markdown",
+    })
   // maybe send message with some description?
 );
 
@@ -312,14 +316,15 @@ user.command(
   // send contact or just link?
   async (ctx) => {
     const now = new Date();
-    if ((now.getUTCHours() <= 6) || (now.getUTCHours() >= 18)) {
-      await ctx.reply("Вибачте, наш робочий день завершився. Ми постараємося відповісти Вам якомога швидше.")
+    if (now.getUTCHours() <= 6 || now.getUTCHours() >= 18) {
+      await ctx.reply(CONSTANTS.WORK_GRAPHIC);
     }
 
-    await ctx.replyWithContact("+380505736797", "Vadym");
-    await ctx.reply(
-      "Якщо у Вас виникнуть будь-які питання, Ви можете звернутись до нашого менеджера."
+    await ctx.replyWithContact(
+      CONSTANTS.SUPPROT_CONTACT_NUMBER,
+      CONSTANTS.SUPPROT_CONTACT_NAME
     );
+    await ctx.reply(CONSTANTS.SUPPORT_DESCRIPTION);
   }
   // ctx.reply("[Связь с нашим менеджером](tg://user?id=306726408)", {
   //   parse_mode: 'Markdown'

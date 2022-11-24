@@ -1,27 +1,16 @@
+// modules
 const { Composer, Bot } = require("grammy");
-const { InlineKeyboard, InputFile } = require("grammy");
+const { InputFile } = require("grammy");
+// constants
 const { CONSTANTS } = require("../constans/user");
-const {
-  checkAndCreateNewUser,
-  setWantToPayTariff,
-  checkIsCourseClosed,
-  setChoosedCourse,
-  getChoosedCourse,
-  getChoosedCourseAndPaymentStatus,
-  isRecruitmentOpened,
-} = require("../../db/models/user/functions");
+// functions
+const { isRecruitmentOpened } = require("../../db/models/user/functions");
+const { uploadFile } = require("../functions");
+// keyboards
 const { userKeyboards } = require("../keyboards/user");
-const { userMessages } = require("../messages/user");
+// models
 const User = require("../../db/models/user/user");
-const {
-  getParticipantsFirstQueue,
-} = require("../../db/models/course/functions");
-const {
-  addUserToReminder,
-  removeUserFromReminder,
-} = require("../../db/models/reminder/functions");
-const { getCoursesInfo, getAllCollections } = require("../xlsx");
-const { getCallbackChatAndMessageId, uploadFile } = require("../functions");
+
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
@@ -30,7 +19,7 @@ const messages = new Composer();
 messages.on("message", async (ctx) => {
   if (ctx?.update?.message?.text === CONSTANTS.TARIFF_PLANS) {
     ctx.reply(
-      `*${CONSTANTS.TARIFF_PLANS}*\n\nЗагальна інформація про тарифні плани з прикладом структури курсів.`,
+      `*${CONSTANTS.TARIFF_PLANS}*\n\n${CONSTANTS.TARIFFS_DESCRIPTION}`,
       {
         reply_markup: userKeyboards.tariffPlans,
         parse_mode: "Markdown",
@@ -40,19 +29,16 @@ messages.on("message", async (ctx) => {
     return;
   }
 
-  if (ctx?.update?.message?.text === CONSTANTS.MY_PAYMENT) {
+  if (ctx?.update?.message?.text === CONSTANTS.PAYMENT) {
     const isOpened = await isRecruitmentOpened();
     if (!isOpened) {
-      return await ctx.reply("Вибачте, в даний момент набір на курси зачинено.");
+      return await ctx.reply(CONSTANTS.SORRY_RECRUITMENT_CLOSED);
     }
 
-    ctx.reply(
-      `*${CONSTANTS.MY_PAYMENT}\n\n*Оберіть, будь ласка, тариф за яким Ви бажаєте здійснити передплату.`,
-      {
-        reply_markup: userKeyboards.tariffsMenu,
-        parse_mode: "Markdown",
-      }
-    );
+    ctx.reply(`*${CONSTANTS.PAYMENT}\n\n*${CONSTANTS.PAYMENT_DESCRIPTION}`, {
+      reply_markup: userKeyboards.tariffsMenu,
+      parse_mode: "Markdown",
+    });
 
     return;
   }
@@ -63,39 +49,41 @@ messages.on("message", async (ctx) => {
     const getPaymentStatus = (status) => {
       switch (status) {
         case "unpaid":
-          return "⛔️ Не сплачено";
+          return CONSTANTS.UNPAID;
         case "pending":
-          return "⏳ Перевіряється";
+          return CONSTANTS.PENDING;
         case "paid":
-          return "✅ Сплачено";
+          return CONSTANTS.PAID;
       }
     };
 
-    const ID = me.userId;
+    const ID = `*ID*: \`${me.userId}\``;
     const userName = me.userName.length
-      ? `\n*User name*: \`${me.userName}\``
+      ? `\n*${CONSTANTS.USER_NAME}*: \`${me.userName}\``
       : "";
     const firstName = me.firstName.length
-      ? `\n*First name*: \`${me.firstName}\``
+      ? `\n*${CONSTANTS.FIRST_NAME}*: \`${me.firstName}\``
       : "";
     const lastName = me.lastName.length
-      ? `\n*Last name*: \`${me.lastName}\``
+      ? `\n*${CONSTANTS.LAST_NAME}*: \`${me.lastName}\``
       : "";
     const fullName = me.fullName.length
-      ? `\n*Ім'я та прізвище*: \`${me.fullName}\``
+      ? `\n*${CONSTANTS.FULL_NAME}*: \`${me.fullName}\``
       : "";
     const course = me.choosedCourse.length
-      ? `\n*Обраний курс*: \`${me.choosedCourse.toUpperCase()}\``
-      : "\n*Обраний курс*: `➖ Не обрано`";
+      ? `\n*${CONSTANTS.CHOOSED_COURSE}*: \`${me.choosedCourse.toUpperCase()}\``
+      : `\n*${CONSTANTS.CHOOSED_COURSE}*: \`${CONSTANTS.NOT_CHOOSED_COURSE}\``;
     const questionary = me.questionary.length
-      ? `\n*Про мене*: \`${me.questionary}\``
+      ? `\n*${CONSTANTS.QUESTIONARY}*: \`${me.questionary}\``
       : "";
     const paymentStatus = me.choosedCourse.length
-      ? `\n*Статус платежу*: \`${getPaymentStatus(me.paymentStatus)}\``
+      ? `\n*${CONSTANTS.PAYMENT_STATUS}*: \`${getPaymentStatus(
+          me.paymentStatus
+        )}\``
       : "";
 
     ctx.reply(
-      `*ID*: \`${ID}\`${userName}${firstName}${lastName}${fullName}${course}${paymentStatus}${questionary}`,
+      `${ID}${userName}${firstName}${lastName}${fullName}${course}${paymentStatus}${questionary}`,
       {
         parse_mode: "Markdown",
       }
@@ -106,14 +94,15 @@ messages.on("message", async (ctx) => {
 
   if (ctx?.update?.message?.text === CONSTANTS.SUPPORT) {
     const now = new Date();
-    if ((now.getUTCHours() <= 6) || (now.getUTCHours() >= 18)) {
-      await ctx.reply("Вибачте, наш робочий день завершився. Ми постараємося відповісти Вам якомога швидше.")
+    if (now.getUTCHours() <= 6 || now.getUTCHours() >= 18) {
+      await ctx.reply(CONSTANTS.WORK_GRAPHIC);
     }
 
-    await ctx.replyWithContact("+380505736797", "Vadym");
-    await ctx.reply(
-      "Якщо у Вас виникнуть будь-які питання, Ви можете звернутись до нашого менеджера."
+    await ctx.replyWithContact(
+      CONSTANTS.SUPPROT_CONTACT_NUMBER,
+      CONSTANTS.SUPPROT_CONTACT_NAME
     );
+    await ctx.reply(CONSTANTS.SUPPORT_DESCRIPTION);
 
     return;
   }
@@ -123,9 +112,12 @@ messages.on("message", async (ctx) => {
 
     await bot.api.sendDocument(
       chat_id,
-      new InputFile("src/files/certificate.pdf", "Приклад сертифікату.pdf"),
+      new InputFile(
+        "src/files/certificate.pdf",
+        `${CONSTANTS.CERTIFICATE_FILE_NAME}.pdf`
+      ),
       {
-        caption: "Приклад сертифікату, який Ви отримаєте по завершенню курсу.",
+        caption: CONSTANTS.CERTIFICATE_DESCRIPTION,
       }
     );
 
@@ -133,13 +125,10 @@ messages.on("message", async (ctx) => {
   }
 
   if (ctx?.update?.message?.text === CONSTANTS.REVIEWS) {
-    await ctx.reply(
-      `За цим посиланням Ви можете ознайомитись з відгуками про нас.`,
-      {
-        reply_markup: userKeyboards.reviewsButton,
-        parse_mode: "Markdown",
-      }
-    );
+    await ctx.reply(CONSTANTS.REVIEWS_DESCRIPTION, {
+      reply_markup: userKeyboards.reviewsButton,
+      parse_mode: "Markdown",
+    });
 
     return;
   }
@@ -164,13 +153,21 @@ messages.on("message", async (ctx) => {
     const { questionary } = await User.findOne({ userId: ctx.from.id });
     await User.findOneAndUpdate(
       { userId: ctx.from.id },
-      { $set: { questionary: `${Boolean(questionary.length) ? `${questionary} ${ctx?.update?.message?.text}` : `${ctx?.update?.message?.text}`}` } }
+      {
+        $set: {
+          questionary: `${
+            Boolean(questionary.length)
+              ? `${questionary} ${ctx?.update?.message?.text}`
+              : `${ctx?.update?.message?.text}`
+          }`,
+        },
+      }
     );
 
     if (!questionary.length) {
-      ctx.reply("Приємно познайомитись 😉");
+      ctx.reply(CONSTANTS.NICE_TO_MEET_YOU);
     } else {
-      ctx.reply("Чим більше ми про тебе дізнаємось, тим краще 😉");
+      ctx.reply(CONSTANTS.EXTRA_INFO_QUESTIONARY);
     }
 
     return;
@@ -191,14 +188,12 @@ messages.on("message", async (ctx) => {
       ctx?.update?.message?.reply_to_message?.text
     );
 
-    await ctx.reply("✅ Файл завантажено успішно.");
+    await ctx.reply(CONSTANTS.FILE_UPLOAD_SUCCESS);
 
     return;
   }
 
-  await ctx.reply(
-    "Вибачте, я не розумію цієї команди 🤷‍♂️ Можливо Ви хотіли відповісти на якесь моє повідомлення?"
-  );
+  await ctx.reply(CONSTANTS.UNKNOWN_COMMAND);
 });
 
 module.exports = messages;

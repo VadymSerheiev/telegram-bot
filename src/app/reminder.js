@@ -1,6 +1,6 @@
 const { Bot } = require("grammy");
-const Course = require("../db/models/course/course");
 const { getUsersToRemind } = require("../db/models/reminder/functions");
+const { CONSTANTS } = require("./constans/user");
 const { userKeyboards } = require("./keyboards/user");
 const bot = new Bot(process.env.BOT_TOKEN);
 
@@ -15,7 +15,7 @@ var reminder = new CronJob("0 0 12 * * *", async () => {
 
   // check and remind every 2 days
     if (hours >= 48) {
-    await bot.api.sendMessage(user.userId, "⏰ Нагадуємо про сплату за тариф.", 
+    await bot.api.sendMessage(user.userId, CONSTANTS.REMINDER, 
       {
         reply_markup: userKeyboards.notRemind,
         parse_mode: "Markdown",
